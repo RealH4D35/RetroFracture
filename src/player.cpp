@@ -1,14 +1,14 @@
 #include "player.h"
-#include <iostream>
 
 Player::Player() {
-    // Set initial position
-    position = point_at(400, 300);
+    // Set initial position (will be set by Game class)
+    position = point_at(0, 0);
     
     // Set movement properties
-    speed = 4.0f;
-    jump_force = -15.0f;
-    gravity = 0.8f;
+    speed = 5.0f;        // Increased for faster movement
+    jump_force = -12.0f;
+    gravity = 0.6f;
+    
     vertical_velocity = 0;
     is_grounded = true;
     facing_right = true;
@@ -27,8 +27,6 @@ Player::Player() {
 }
 
 void Player::setup_animations() {
-    // Load only the animations we need for basic movement
-    
     load_animation("assets/sprites/striker/spr_StrikerIdle_strip.png", 
                    STATE_IDLE, 8, 96, 96, 10, true);
     
@@ -38,12 +36,13 @@ void Player::setup_animations() {
     load_animation("assets/sprites/striker/spr_StrikerJump_strip.png", 
                    STATE_JUMP, 12, 96, 96, 8, false);
     
-    // For falling, we'll use the same as jump but start at a later frame
     load_animation("assets/sprites/striker/spr_StrikerJump_strip.png", 
                    STATE_FALL, 12, 96, 96, 8, false);
     
-    std::cout << "Setup animations for basic movement" << std::endl;
+    write_line("Player animations loaded");
 }
+
+// ... rest of the file remains the same as before ...
 
 void Player::load_animation(const std::string& filename, PlayerState state, 
                            int frame_count, int frame_width, int frame_height, 
@@ -73,16 +72,8 @@ void Player::update() {
         vertical_velocity += gravity;
         position.y += vertical_velocity;
         
-        // Check if landed
-        if (position.y >= 600) {
-            position.y = 600;
-            vertical_velocity = 0;
-            is_grounded = true;
-            
-            if (current_state == STATE_JUMP || current_state == STATE_FALL) {
-                set_state(STATE_IDLE);
-            }
-        } else if (vertical_velocity > 0 && current_state == STATE_JUMP) {
+        // Check if falling (positive velocity)
+        if (vertical_velocity > 0 && current_state == STATE_JUMP) {
             // Start falling
             set_state(STATE_FALL);
         }
@@ -90,6 +81,10 @@ void Player::update() {
     
     // Update animation
     update_animation();
+}
+
+void Player::stop_vertical_movement() {
+    vertical_velocity = 0;
 }
 
 void Player::update_animation() {
@@ -138,6 +133,11 @@ void Player::set_state(PlayerState new_state) {
 }
 
 void Player::draw() {
+    // This is the original draw method - kept for compatibility
+    draw_at(position);
+}
+
+void Player::draw_at(point_2d screen_position) {
     if (!current_animation) {
         return;
     }
@@ -151,8 +151,8 @@ void Player::draw() {
                                          current_animation->frame_height);
     
     // Calculate draw position (center the sprite horizontally, align feet to position.y)
-    float draw_x = position.x - current_animation->frame_width / 2;
-    float draw_y = position.y - current_animation->frame_height;
+    float draw_x = screen_position.x - current_animation->frame_width / 2;
+    float draw_y = screen_position.y - current_animation->frame_height;
     
     // Create drawing options
     drawing_options opts = option_part_bmp(frame_rect);

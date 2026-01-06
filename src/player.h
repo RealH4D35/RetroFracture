@@ -41,7 +41,8 @@ public:
     Player();
     
     void update();
-    void draw();
+    void draw();  // Draw at world position (for debugging)
+    void draw_at(point_2d screen_position);  // Draw at specific screen position
     
     void set_state(PlayerState new_state);
     PlayerState get_state() const { return current_state; }
@@ -50,9 +51,12 @@ public:
     void move_right();
     void jump();
     void stop_moving();
+    void stop_vertical_movement();  // Add this method
     
     point_2d get_position() const { return position; }
+    void set_position(point_2d new_pos) { position = new_pos; }
     bool get_is_grounded() const { return is_grounded; }
+    void set_grounded(bool grounded) { is_grounded = grounded; }
     bool get_facing_right() const { return facing_right; }
     
     int get_current_frame_index() const { return current_frame_index; }
