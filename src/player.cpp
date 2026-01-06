@@ -7,10 +7,10 @@ Player::Player() {
     // Set movement properties
     speed = 5.0f;        // Increased for faster movement
     jump_force = -12.0f;
-    gravity = 0.6f;
+    gravity = 1.0f;
     
     vertical_velocity = 0;
-    is_grounded = true;
+    is_grounded = true;  // Start as grounded
     facing_right = true;
     
     // Animation properties
@@ -25,6 +25,7 @@ Player::Player() {
     // Start with idle animation
     set_state(STATE_IDLE);
 }
+
 
 void Player::setup_animations() {
     load_animation("assets/sprites/striker/spr_StrikerIdle_strip.png", 

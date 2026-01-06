@@ -9,34 +9,39 @@ Game::Game() : quit_game(false), camera_pos(point_at(0, 0)) {
     background_original_width = bitmap_width(background);
     background_original_height = bitmap_height(background);
     
-    // Instead of forcing the height to 600, let's scale proportionally
-    // Calculate how to show the entire width (639px) in the 800px window
-    // This means we'll have void on top and bottom, but can see the whole hallway width
-    scale_factor = 800.0f / background_original_width;  // Scale to fit width in window
+    // Scale to fit width (800px)
+    scale_factor = 800.0f / background_original_width;
     
     // Calculate scaled dimensions
-    background_scaled_width = background_original_width * scale_factor;  // Should be ~800
-    background_scaled_height = background_original_height * scale_factor;  // Should be ~450
-    
-    write_line("Original background: " + std::to_string(background_original_width) + "x" + 
-               std::to_string(background_original_height));
-    write_line("Scaled background: " + std::to_string(background_scaled_width) + "x" + 
-               std::to_string(background_scaled_height));
-    write_line("Scale factor: " + std::to_string(scale_factor));
+    background_scaled_width = background_original_width * scale_factor;
+    background_scaled_height = background_original_height * scale_factor;
     
     // Calculate where to position the background vertically (center it)
     background_y_offset = (600 - background_scaled_height) / 2;
     
-    // Set initial player position (center of screen)
-    float start_x = 400;  // Center of screen
-    float start_y = 265;  // Middle of background vertically
+    // Set ground level
+    ground_level = background_scaled_height - 189;
+    
+    // ====================================================
+    // START PLAYER AT LEFT EDGE ON THE GROUND
+    // ====================================================
+    float start_x = 48.0f;  // Half sprite width (96/2), so player doesn't go off-screen
+    float start_y = ground_level;  // On the ground
     
     player.set_position(point_at(start_x, start_y));
     
-    // Start camera at 0,0 (will center on player)
-    camera_pos = point_at(0, 0);
+    // Set player to grounded state immediately
+    player.set_grounded(true);
+    player.set_state(STATE_IDLE);
     
-    write_line("Player starting at: " + std::to_string(start_x) + ", " + std::to_string(start_y));
+    // Start camera so player is at left edge of screen
+    // Camera x = player.x - 400 (center of screen)
+    camera_pos = point_at(start_x - 400, start_y - 300);
+    
+    // Clamp camera to not go past left edge of background
+    if (camera_pos.x < 0) camera_pos.x = 0;
+    
+    write_line("Player starting at left edge: " + std::to_string(start_x) + ", " + std::to_string(start_y));
     write_line("Background Y offset: " + std::to_string(background_y_offset));
 }
 
@@ -67,10 +72,8 @@ void Game::update_camera() {
     camera_pos.x = camera_pos.x * 0.9f + target_camera_x * 0.1f;
     camera_pos.y = camera_pos.y * 0.9f + target_camera_y * 0.1f;
     
-    // NO CLAMPING to world boundaries - camera can follow player anywhere
-    // This allows us to see the entire image by moving the player
-    
-    write_line("Camera: " + std::to_string(camera_pos.x) + ", " + std::to_string(camera_pos.y));
+    // Clamp camera to left edge only (can't go left of background)
+    if (camera_pos.x < 0) camera_pos.x = 0;
 }
 
 point_2d Game::world_to_screen(point_2d world_pos) {
@@ -112,47 +115,34 @@ void Game::draw() {
                          "x" + std::to_string((int)background_scaled_height);
     draw_text(bg_text, COLOR_YELLOW, 10, 90);
     
-    // Visual indicator for image boundaries
-    float screen_left_boundary = -camera_pos.x;
-    float screen_right_boundary = -camera_pos.x + background_scaled_width;
-    float screen_top_boundary = background_y_offset - camera_pos.y;
-    float screen_bottom_boundary = background_y_offset - camera_pos.y + background_scaled_height;
+    // Draw ground line
+    float screen_ground_y = world_to_screen(point_at(0, ground_level)).y;
+    draw_line(COLOR_RED, 0, screen_ground_y, 800, screen_ground_y);
+    draw_text("GROUND", COLOR_RED, 10, screen_ground_y - 10);
     
-    // Draw image boundaries (only if they're visible on screen)
-    if (screen_left_boundary >= 0 && screen_left_boundary <= 800) {
-        draw_line(COLOR_GREEN, screen_left_boundary, 0, screen_left_boundary, 600);
-        draw_text("LEFT", COLOR_GREEN, screen_left_boundary + 5, 20);
+    // Draw left boundary
+    if (camera_pos.x <= 0) {
+        draw_line(COLOR_RED, 0, 0, 0, 600);
+        draw_text("LEFT BOUNDARY", COLOR_RED, 5, 20);
     }
-    
-    if (screen_right_boundary >= 0 && screen_right_boundary <= 800) {
-        draw_line(COLOR_GREEN, screen_right_boundary, 0, screen_right_boundary, 600);
-        draw_text("RIGHT", COLOR_GREEN, screen_right_boundary - 40, 20);
-    }
-    
-    if (screen_top_boundary >= 0 && screen_top_boundary <= 600) {
-        draw_line(COLOR_GREEN, 0, screen_top_boundary, 800, screen_top_boundary);
-        draw_text("TOP", COLOR_GREEN, 10, screen_top_boundary + 5);
-    }
-    
-    if (screen_bottom_boundary >= 0 && screen_bottom_boundary <= 600) {
-        draw_line(COLOR_GREEN, 0, screen_bottom_boundary, 800, screen_bottom_boundary);
-        draw_text("BOTTOM", COLOR_GREEN, 10, screen_bottom_boundary - 20);
-    }
-    
-    // Draw center crosshair to show camera center
-    draw_line(COLOR_RED, 398, 298, 402, 302);
-    draw_line(COLOR_RED, 402, 298, 398, 302);
 }
 
 void Game::check_boundaries() {
     point_2d pos = player.get_position();
     
-    // REMOVED LEFT AND RIGHT BOUNDARIES - player can move freely horizontally
+    // ====================================================
+    // LEFT-SIDE COLLISION ONLY
+    // ====================================================
+    float sprite_half_width = 48;  // 96px sprite, half is 48px
     
-    // Ground level - bottom of background (in world coordinates)
-    float ground_level = background_scaled_height - 185;
+    // Left boundary - player can't go past left edge
+    if (pos.x < sprite_half_width) {
+        pos.x = sprite_half_width;
+    }
     
-    // Can't go below ground
+    // No right boundary - player can move freely to the right
+    
+    // Ground collision
     if (pos.y > ground_level) {
         pos.y = ground_level;
         if (!player.get_is_grounded() && player.get_state() == STATE_FALL) {
@@ -161,7 +151,7 @@ void Game::check_boundaries() {
         player.set_grounded(true);
     }
     
-    // Can't go above top of world
+    // Ceiling collision
     float ceiling_level = 50;
     if (pos.y < ceiling_level) {
         pos.y = ceiling_level;
@@ -174,7 +164,12 @@ void Game::check_boundaries() {
 
 void Game::handle_input() {
     if (key_down(A_KEY)) {
-        player.move_left();
+        // Check if player is at left boundary
+        point_2d pos = player.get_position();
+        float sprite_half_width = 48;
+        if (pos.x > sprite_half_width) {  // Only move left if not at boundary
+            player.move_left();
+        }
     }
     else if (key_down(D_KEY)) {
         player.move_right();
@@ -191,15 +186,20 @@ void Game::handle_input() {
         quit_game = true;
     }
     
-    // Debug: reset camera and player position
+    // Debug: reset to starting position
     if (key_typed(R_KEY)) {
-        camera_pos = point_at(0, 0);
-        player.set_position(point_at(400, 300));
+        float start_x = 48.0f;
+        player.set_position(point_at(start_x, ground_level));
+        player.set_grounded(true);
+        player.set_state(STATE_IDLE);
+        camera_pos = point_at(start_x - 400, ground_level - 300);
+        if (camera_pos.x < 0) camera_pos.x = 0;
     }
     
     // Debug: move camera with arrow keys
     if (key_down(LEFT_KEY)) {
         camera_pos.x -= 10;
+        if (camera_pos.x < 0) camera_pos.x = 0;
     }
     if (key_down(RIGHT_KEY)) {
         camera_pos.x += 10;

@@ -19,6 +19,9 @@ private:
     float scale_factor;
     float background_y_offset;
     
+    // Level boundaries
+    float ground_level;  // Add this
+    
 public:
     Game();
     void run();
